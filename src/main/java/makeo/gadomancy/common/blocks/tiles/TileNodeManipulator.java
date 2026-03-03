@@ -2,6 +2,7 @@ package makeo.gadomancy.common.blocks.tiles;
 
 import cpw.mods.fml.common.network.NetworkRegistry;
 import makeo.gadomancy.common.Gadomancy;
+import makeo.gadomancy.common.blocks.tiles.TileNodeManipulator.MultiblockType;
 import makeo.gadomancy.common.network.PacketHandler;
 import makeo.gadomancy.common.network.packets.PacketStartAnimation;
 import makeo.gadomancy.common.network.packets.PacketTCNodeBolt;
@@ -150,7 +151,7 @@ public class TileNodeManipulator extends TileWandPedestal implements IAspectCont
     }
 
     private boolean checkTile(TilePedestal te) {
-        ItemStack stack = te.getStackInSlot(0);
+        ItemStack stack = te.func_70301_a(0); // te.getStackInSlot(0);
         return !(stack == null || stack.getItem() != ConfigItems.itemEldritchObject || stack.getItemDamage() != 0);
     }
 
@@ -207,7 +208,7 @@ public class TileNodeManipulator extends TileWandPedestal implements IAspectCont
         for (ChunkCoordinates cc : bufferedCCPedestals) {
             try {
                 TilePedestal pedestal = (TilePedestal) worldObj.getTileEntity(cc.posX, cc.posY, cc.posZ);
-                pedestal.setInventorySlotContents(0, null);
+                pedestal.func_70299_a(0, null); // pedestal.setInventorySlotContents(0, null);
                 PacketStartAnimation packet = new PacketStartAnimation(PacketStartAnimation.ID_SPARKLE_SPREAD, cc.posX, cc.posY, cc.posZ);
                 PacketHandler.INSTANCE.sendToAllAround(packet, getTargetPoint(32));
             } catch (Exception exc) {}
@@ -315,7 +316,7 @@ public class TileNodeManipulator extends TileWandPedestal implements IAspectCont
     }
 
     private Aspect drainAspectFromWand(int cap) {
-        ItemStack stack = getStackInSlot(0);
+        ItemStack stack = func_70301_a(0); // getStackInSlot(0);
         if(stack == null || !(stack.getItem() instanceof ItemWandCasting)) return null; //Should never happen..
         AspectList aspects = ((ItemWandCasting) stack.getItem()).getAllVis(stack);
         for(Aspect a : getRandomlyOrderedPrimalAspectList()) {
@@ -336,7 +337,7 @@ public class TileNodeManipulator extends TileWandPedestal implements IAspectCont
     }
 
     private boolean canDrainFromWand(int cap) {
-        ItemStack stack = getStackInSlot(0);
+        ItemStack stack = func_70301_a(0); // getStackInSlot(0);
         if(stack == null || !(stack.getItem() instanceof ItemWandCasting)) return false;
         AspectList aspects = ((ItemWandCasting) stack.getItem()).getAllVis(stack);
         for(Aspect a : Aspect.getPrimalAspects()) {
@@ -365,7 +366,7 @@ public class TileNodeManipulator extends TileWandPedestal implements IAspectCont
     }
 
     private void dropWand() {
-        if(getStackInSlot(0) != null)
+        if(func_70301_a(0) != null) // getStackInSlot(0)
             InventoryUtils.dropItems(worldObj, xCoord, yCoord, zCoord);
     }
 
@@ -556,7 +557,7 @@ public class TileNodeManipulator extends TileWandPedestal implements IAspectCont
 
     @Override
     public boolean canInsertItem(int par1, ItemStack par2ItemStack, int par3) {
-        return isInMultiblock() && super.canInsertItem(par1, par2ItemStack, par3);
+        return isInMultiblock() && super.func_102007_a(par1, par2ItemStack, par3); // super.canInsertItem(par1, par2ItemStack, par3);
     }
 
     public NetworkRegistry.TargetPoint getTargetPoint(double radius) {

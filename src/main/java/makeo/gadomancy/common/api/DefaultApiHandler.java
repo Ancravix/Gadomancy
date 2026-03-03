@@ -45,6 +45,8 @@ public class DefaultApiHandler implements IApiHandler {
     public boolean registerAdditionalGolemType(String name, String modId, AdditionalGolemType newType) {
         String uniqueName = name.toUpperCase();
         if(!additionalGolemTypes.containsKey(uniqueName)) {
+            log.info("Registering golem type: " + name);
+
             GolemEnumHelper.addGolemType(uniqueName, newType);
 
             ItemAdditionalGolemPlacer placerItem = new ItemAdditionalGolemPlacer(newType);
@@ -53,6 +55,8 @@ public class DefaultApiHandler implements IApiHandler {
             newType.setPlacerItem(placerItem);
 
             additionalGolemTypes.put(uniqueName, newType);
+            
+            log.info("Enum entry after register: " + newType.getEnumEntry());
             return true;
         }
         return false;

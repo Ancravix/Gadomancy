@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+FMLCorePluginContainsFMLMod: true
+FMLAT: gadomancy_at.cfg
+FMLCorePlugin: makeo.gadomancy.coremod.GadomancyCore
+

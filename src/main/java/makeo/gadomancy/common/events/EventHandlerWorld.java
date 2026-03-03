@@ -21,6 +21,7 @@ import makeo.gadomancy.common.utils.NBTHelper;
 import makeo.gadomancy.common.utils.WandHandler;
 import makeo.gadomancy.common.utils.world.TCMazeHandler;
 import net.minecraft.entity.Entity;
+import net.minecraft.block.Block;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
@@ -196,26 +197,49 @@ public class EventHandlerWorld {
 
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public void on(BlockEvent.PlaceEvent e) {
+
         if (e.isCanceled()) {
             if (interacts != null)
                 interacts.remove(e.player);
-        } else {
-            if (!e.world.isRemote && isStickyJar(e.itemInHand)) {
-                TileEntity parent = e.world.getTileEntity(e.x, e.y, e.z);
-                if (parent instanceof TileJarFillable) {
-                    int metadata = e.world.getBlockMetadata(e.x, e.y, e.z);
-                    e.world.setBlock(e.x, e.y, e.z, RegisteredBlocks.blockStickyJar, metadata, 2);
-
-                    TileEntity tile = e.world.getTileEntity(e.x, e.y, e.z);
-                    if (tile instanceof TileStickyJar) {
-                        Integer sideHit = interacts.get(e.player);
-                        ((TileStickyJar) tile).init((TileJarFillable) parent, e.placedBlock, metadata,
-                                ForgeDirection.getOrientation(sideHit == null ? 1 : sideHit).getOpposite());
-                        RegisteredBlocks.blockStickyJar.onBlockPlacedBy(e.world, e.x, e.y, e.z, e.player, e.itemInHand);
-                    }
-                }
-            }
+            return;
         }
+
+        if (e.world.isRemote)
+            return;
+        if (!isStickyJar(e.itemInHand))
+            return;
+
+        TileEntity te = e.world.getTileEntity(e.x, e.y, e.z);
+        if (!(te instanceof TileJarFillable))
+            return;
+
+        // === [1] Родительский блок + ЕГО meta (тип банки) ===
+        final Block parentBlock = e.world.getBlock(e.x, e.y, e.z);
+        final int parentMeta = e.world.getBlockMetadata(e.x, e.y, e.z);
+
+        // === [2] Слепок NBT родительского TE ДО замены блока ===
+        final NBTTagCompound parentNbt = new NBTTagCompound();
+        ((TileJarFillable) te).writeToNBT(parentNbt);
+
+        // === [3] Сторона крепления (meta sticky) ===
+        Integer sideHit = (interacts != null) ? interacts.get(e.player) : null;
+        ForgeDirection dir = ForgeDirection.getOrientation(sideHit == null ? 1 : sideHit);
+        int placedOnMeta = dir.getOpposite().ordinal(); // sticky meta = сторона крепления
+
+        // === [4] Ставим sticky-блок ===
+        e.world.setBlock(e.x, e.y, e.z, RegisteredBlocks.blockStickyJar, placedOnMeta, 3);
+
+        // === [5] Инициализируем sticky из NBT ===
+        TileEntity newTe = e.world.getTileEntity(e.x, e.y, e.z);
+        if (newTe instanceof TileStickyJar) {
+            ((TileStickyJar) newTe).initFromNBT(parentNbt, parentBlock, parentMeta);
+
+            // если нужно выставить facing для боковых установок
+            RegisteredBlocks.blockStickyJar.onBlockPlacedOn(e.world, e.x, e.y, e.z, e.player);
+        }
+
+        if (interacts != null)
+            interacts.remove(e.player);
     }
 
     @SubscribeEvent

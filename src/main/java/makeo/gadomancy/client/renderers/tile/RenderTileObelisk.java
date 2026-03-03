@@ -19,10 +19,10 @@ public class RenderTileObelisk extends TileEldritchObeliskRenderer {
         if(te.getWorldObj().provider.dimensionId == ModConfig.dimOuterId) {
             int old = Config.dimensionOuterId;
             Config.dimensionOuterId = ModConfig.dimOuterId;
-            super.renderTileEntityAt(te, x, y, z, f);
+            super.func_147500_a(te, x, y, z, f); // super.renderTileEntityAt(te, x, y, z, f);
             Config.dimensionOuterId = old;
         } else {
-            super.renderTileEntityAt(te, x, y, z, f);
+            super.func_147500_a(te, x, y, z, f); // super.renderTileEntityAt(te, x, y, z, f);
         }
     }
 }

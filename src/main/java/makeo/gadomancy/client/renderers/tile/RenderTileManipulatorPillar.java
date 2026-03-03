@@ -26,7 +26,7 @@ public class RenderTileManipulatorPillar extends TileInfusionPillarRenderer {
     public void renderTileEntityAt(TileEntity par1TileEntity, double par2, double par4, double par6, float par8) {
         ResourceLocation originalTexture = BOUND_TEXTURES.get(TC_TEXTURE);
         BOUND_TEXTURES.put(TC_TEXTURE, TEXTURE);
-        super.renderTileEntityAt(par1TileEntity, par2, par4, par6, par8);
+        super.func_147500_a(par1TileEntity, par2, par4, par6, par8);
 
         if(originalTexture != null) {
             BOUND_TEXTURES.put(TC_TEXTURE, originalTexture);

@@ -64,7 +64,7 @@ public class RenderTileRemoteJar extends TileJarRenderer {
         GL11.glPopMatrix();
         GL11.glPopAttrib();
 
-        super.renderTileEntityAt(tile, x, y, z, partialTicks);
+        super.func_147500_a(tile, x, y, z, partialTicks); // super.renderTileEntityAt(tile, x, y, z, partialTicks);
     }
 
     private TileMirrorEssentia createFakeTile(TileEntity tile, boolean linked) {

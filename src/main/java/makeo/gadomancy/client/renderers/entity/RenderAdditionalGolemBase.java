@@ -92,6 +92,6 @@ public class RenderAdditionalGolemBase extends RenderGolemBase {
         if (type != null) {
             return type.getEntityTexture();
         }
-        return super.getEntityTexture(entity);
+        return super.func_110775_a(entity); //getEntityTexture(entity);
     }
 }

@@ -22,7 +22,7 @@ public class RenderTileNodeManipulator extends TileWandPedestalRenderer {
 
     @Override
     public void renderTileEntityAt(TileEntity tile, double x, double y, double z, float partitalTicks) {
-        super.renderTileEntityAt(tile, x, y, z, partitalTicks);
+        super.func_147500_a(tile, x, y, z, partitalTicks); // super.renderTileEntityAt(tile, x, y, z, partitalTicks);
     }
 
     public static void renderColorCubes(float r, float g, float b, float a) {

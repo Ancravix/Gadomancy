@@ -26,7 +26,8 @@ public class GolemEnumHelper {
     private static final RemovedGolemType REMOVED_GOLEM_TYPE = new RemovedGolemType();
     private static final Injector INJECTOR = new Injector(EnumGolemType.class);
     private static final Injector ENUM_INJECTOR = new Injector(Enum.class);
-    private static final Injector HELPER_INJECTOR = new Injector(EnumHelper.class);
+    private static final Injector CLASS_INJECTOR = new Injector(Class.class);
+    private static Map<String, Integer> defaultMapping;
 
     private static Field valuesField = null;
     private static Field getValuesField() {
@@ -44,8 +45,12 @@ public class GolemEnumHelper {
         return valuesField;
     }
 
-    private static final Class[] ENUM_PARAMS = {int.class, int.class, float.class, boolean.class, int.class,
-            int.class, int.class, int.class};
+    private static final Class<?>[] ENUM_PARAMS;
+
+    static {
+        ENUM_PARAMS = new Class[]{String.class, Integer.TYPE, Integer.TYPE, Integer.TYPE, Float.TYPE, Boolean.TYPE, Integer.TYPE, Integer.TYPE, Integer.TYPE, Integer.TYPE};
+        defaultMapping = new HashMap<String, Integer>();
+    }
 
     private static Field ordinalField = null;
     public static Field getOrdinalField() {
@@ -57,12 +62,28 @@ public class GolemEnumHelper {
         return ordinalField;
     }
 
-    private static final Class[] MAKE_ENUM_PARAMS = new Class[]{ Class.class, String.class, int.class, Class[].class, Object[].class };
-
     private static EnumGolemType createEnum(String name, int ordinal, AdditionalGolemType type) {
-        return HELPER_INJECTOR.invokeMethod("makeEnum", MAKE_ENUM_PARAMS,
-                EnumGolemType.class, name, ordinal, ENUM_PARAMS, new Object[]{ type.maxHealth, type.armor, type.movementSpeed,
-                        type.fireResist, type.upgradeAmount, type.carryLimit, type.regenDelay, type.strength });
+        GolemEnumHelper.resetEnumCache();
+        return (EnumGolemType)INJECTOR.invokeUnsafeConstructor(ENUM_PARAMS, name, ordinal,
+            type.maxHealth, type.armor, Float.valueOf(type.movementSpeed), type.fireResist, type.upgradeAmount, type.carryLimit, type.regenDelay, type.strength);
+    }
+
+    private static void resetEnumCache() {
+        CLASS_INJECTOR.setObject(EnumGolemType.class);
+        try {
+            Field enumConstants = EnumGolemType.class.getClass().getDeclaredField("enumConstants");
+            CLASS_INJECTOR.setField(enumConstants, null);
+        }
+        catch (Exception enumConstants) {
+            // empty catch block
+        }
+        try {
+            Field enumConstantDirectory = EnumGolemType.class.getClass().getDeclaredField("enumConstantDirectory");
+            CLASS_INJECTOR.setField(enumConstantDirectory, null);
+        }
+        catch (Exception exception) {
+            // empty catch block
+        }
     }
 
     private static void addEnum(int ordinal, EnumGolemType type) {
@@ -179,8 +200,6 @@ public class GolemEnumHelper {
             }
         }
     }
-
-    private static Map<String, Integer> defaultMapping = new HashMap<String, Integer>();
 
     public static Map<String, Integer> getCurrentMapping() {
         if(hasCurrentMapping()) {

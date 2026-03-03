@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraft.util.ResourceLocation;
+import java.lang.reflect.Field;
 import net.minecraft.util.StatCollector;
 import net.minecraft.util.StringTranslate;
 
@@ -32,8 +33,10 @@ public class ResourceReloadListener implements IResourceManagerReloadListener {
     public static Map languageList;
 
     private ResourceReloadListener() {
-        Injector instance = new Injector(new Injector(StringTranslate.class)
-                .getField(Injector.findField(StringTranslate.class, StringTranslate.class)));
+        Field field = Injector.findField(StringTranslate.class, StringTranslate.class);
+        Object value = new Injector(StringTranslate.class).getField(field);
+        Injector instance = new Injector(value);
+
         languageList = instance.getField(instance.findField(Map.class));
     }
 

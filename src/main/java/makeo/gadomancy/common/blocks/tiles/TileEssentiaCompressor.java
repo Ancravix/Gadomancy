@@ -133,7 +133,7 @@ public class TileEssentiaCompressor extends SynchronizedTileEntity implements IA
             } else {
                 TilePedestal te = (TilePedestal) worldObj.getTileEntity(
                         coordPedestal.getBlockX(), coordPedestal.getBlockY(), coordPedestal.getBlockZ());
-                te.setInventorySlotContents(0, null);
+                te.func_70299_a(0, null); // te.setInventorySlotContents(0, null);
                 te.markDirty();
                 worldObj.markBlockForUpdate(
                         coordPedestal.getBlockX(), coordPedestal.getBlockY(), coordPedestal.getBlockZ());
@@ -168,7 +168,7 @@ public class TileEssentiaCompressor extends SynchronizedTileEntity implements IA
                 coordPedestal.getBlockX(), coordPedestal.getBlockY(), coordPedestal.getBlockZ());
         if(at == null || te == null || md != 1) return false;
         if(!at.equals(RegisteredBlocks.blockStoneMachine) || !(te instanceof TilePedestal)) return false;
-        ItemStack st = ((TilePedestal) te).getStackInSlot(0);
+        ItemStack st = ((TilePedestal) te).func_70301_a(0); // getStackInSlot(0)
         if(st == null || st.getItem() == null) return false;
         return st.getItem().equals(RegisteredItems.itemElement) && st.getItemDamage() == 0;
     }

@@ -6,6 +6,9 @@ import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.Packet;
+import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
@@ -33,7 +36,7 @@ public class TileStickyJar extends TileJarFillable {
 
     private TileJarFillable parent = null;
 
-    public ForgeDirection placedOn;
+    public ForgeDirection placedOn = ForgeDirection.DOWN;
 
     private final Injector injector;
     private Field fieldCount;
@@ -55,29 +58,94 @@ public class TileStickyJar extends TileJarFillable {
         return parentBlock != null && parent != null;
     }
 
+    public ForgeDirection getPlacedOn() {
+        if (worldObj == null)
+            return ForgeDirection.DOWN;
+
+        ForgeDirection metaDir = ForgeDirection.getOrientation(
+                worldObj.getBlockMetadata(xCoord, yCoord, zCoord));
+
+        return metaDir != null ? metaDir : ForgeDirection.DOWN;
+    }
+
     private boolean needsRenderUpdate = false;
 
-    public void init(TileJarFillable parent, Block parentBlock, int parentMetadata, ForgeDirection placedOn) {
+    // public void init(TileJarFillable parent,
+    // Block parentBlock,
+    // int parentMetadata,
+    // ForgeDirection placedOn) {
+    // // this.placedOn = (placedOn != null ? placedOn.getOpposite() :
+    // ForgeDirection.DOWN);
+    // this.placedOn = getPlacedOn();
+
+    // // if (worldObj != null && !worldObj.isRemote) {
+    // // worldObj.setBlockMetadataWithNotify(xCoord, yCoord, zCoord,
+    // this.placedOn.ordinal(), 2);
+    // // }
+
+    // init(parent, parentBlock, parentMetadata);
+    // }
+
+    public void init(TileJarFillable parent, Block parentBlock, int parentMetadata) {
         this.parent = parent;
+        this.parentBlock = parentBlock;
+        this.parentMetadata = parentMetadata;
 
-        this.placedOn = placedOn;
+        this.parent.setWorldObj(worldObj);
+        this.parent.xCoord = xCoord;
+        this.parent.yCoord = yCoord;
+        this.parent.zCoord = zCoord;
 
-        parent.xCoord = xCoord;
-        parent.yCoord = yCoord;
-        parent.zCoord = zCoord;
+        this.injector.setObject(this.parent);
 
         syncFromParent();
 
-        this.parent.setWorldObj(getWorldObj());
+        markDirty();
+        needsRenderUpdate = true;
+
+        if (worldObj != null && !worldObj.isRemote) {
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+        }
+    }
+
+    public void initFromNBT(NBTTagCompound parentData, Block parentBlock, int parentMetadata) {
         this.parentBlock = parentBlock;
         this.parentMetadata = parentMetadata;
+
+        if (parentMetadata >= 0 && parentMetadata <= 6) {
+            System.out.println("WARN: parentMetadata looks like placedOn meta = " + parentMetadata);
+        }
+
+        TileEntity t = TileEntity.createAndLoadEntity(parentData);
+        if (!(t instanceof TileJarFillable)) {
+            this.parent = null;
+            return;
+        }
+
+        this.parent = (TileJarFillable) t;
         this.injector.setObject(this.parent);
+
+        // важно: мир/координаты
+        this.parent.setWorldObj(worldObj);
+        this.parent.xCoord = xCoord;
+        this.parent.yCoord = yCoord;
+        this.parent.zCoord = zCoord;
+
+        // подтянуть поля в sticky (aspect/amount/и т.п.)
+        syncFromParent();
 
         markDirty();
         needsRenderUpdate = true;
+
+        if (worldObj != null && !worldObj.isRemote) {
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+        }
     }
 
     private void sync(TileJarFillable from, TileJarFillable to) {
+        if (from == null || to == null)
+            return;
+        
         to.aspect = from.aspect;
         to.aspectFilter = from.aspectFilter;
         to.amount = from.amount;
@@ -86,11 +154,11 @@ public class TileStickyJar extends TileJarFillable {
         to.forgeLiquid = from.forgeLiquid;
         to.lid = from.lid;
     }
-    
+
     public void syncToParent() {
         sync(this, parent);
     }
-    
+
     public void syncFromParent() {
         sync(parent, this);
     }
@@ -99,34 +167,66 @@ public class TileStickyJar extends TileJarFillable {
         return parentMetadata;
     }
 
+    public void setParentMetadata(int meta) {
+        this.parentMetadata = meta;
+    }
+
+    @Override
+    public Packet getDescriptionPacket() {
+        NBTTagCompound nbt = new NBTTagCompound();
+
+        if (parent != null) {
+            syncToParent();
+        }
+
+        writeCustomNBT(nbt);
+        return new S35PacketUpdateTileEntity(xCoord, yCoord, zCoord, 1, nbt);
+    }
+
+    @Override
+    public void onDataPacket(NetworkManager net, S35PacketUpdateTileEntity pkt) {
+        readCustomNBT(pkt.func_148857_g());
+
+        if (worldObj != null) {
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+        }
+    }
+
+    private void syncPlacedOnFromBlock() {
+        placedOn = getPlacedOn();
+    }
+
     private int count;
 
     @Override
     public void updateEntity() {
-        if(!isValid()) {
-            if(!getWorldObj().isRemote) {
-                getWorldObj().setBlock(this.xCoord, this.yCoord, this.zCoord, Blocks.air);
-            }
+        syncPlacedOnFromBlock();
+
+        if (!isValid()) {
             return;
         }
 
-        if(getWorldObj().isRemote && needsRenderUpdate) {
+        if (worldObj.isRemote && needsRenderUpdate) {
             needsRenderUpdate = false;
-            Minecraft.getMinecraft().renderGlobal.markBlockForUpdate(xCoord, yCoord, zCoord);
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
         }
 
         syncToParent();
 
-        boolean canTakeEssentia = this.amount < this.maxAmount;
-        if(parent instanceof TileJarFillableVoid) canTakeEssentia = true;
+        boolean canTakeEssentia = amount < maxAmount;
+        if (parent instanceof TileJarFillableVoid) {
+            canTakeEssentia = true;
+        }
 
-        if ((!this.worldObj.isRemote) && (++this.count % 5 == 0) && canTakeEssentia) {
+        if (!worldObj.isRemote && (++count % 5 == 0) && canTakeEssentia) {
             fillJar();
         }
 
         injector.setField(fieldCount, 1);
 
-        parent.updateEntity();
+        if (!worldObj.isRemote) {
+            parent.updateEntity();
+        }
 
         syncFromParent();
     }
@@ -134,17 +234,17 @@ public class TileStickyJar extends TileJarFillable {
     @Override
     public void setWorldObj(World world) {
         super.setWorldObj(world);
-        if(parent != null)
+        if (parent != null)
             parent.setWorldObj(worldObj);
     }
 
     private void fillJar() {
-        ForgeDirection inputDir = placedOn.getOpposite();
+        ForgeDirection inputDir = getPlacedOn();
 
-        TileEntity te = ThaumcraftApiHelper.getConnectableTile(parent.getWorldObj(), parent.xCoord, parent.yCoord, parent.zCoord, inputDir);
-        if (te != null)
-        {
-            IEssentiaTransport ic = (IEssentiaTransport)te;
+        TileEntity te = ThaumcraftApiHelper.getConnectableTile(parent.getWorldObj(), parent.xCoord, parent.yCoord,
+                parent.zCoord, inputDir);
+        if (te != null) {
+            IEssentiaTransport ic = (IEssentiaTransport) te;
             if (!ic.canOutputTo(ForgeDirection.DOWN)) {
                 return;
             }
@@ -154,7 +254,8 @@ public class TileStickyJar extends TileJarFillable {
             } else if ((parent.aspect != null) && (parent.amount > 0)) {
                 ta = parent.aspect;
             } else if ((ic.getEssentiaAmount(inputDir.getOpposite()) > 0) &&
-                    (ic.getSuctionAmount(inputDir.getOpposite()) < getSuctionAmount(ForgeDirection.UP)) && (getSuctionAmount(ForgeDirection.UP) >= ic.getMinimumSuction())) {
+                    (ic.getSuctionAmount(inputDir.getOpposite()) < getSuctionAmount(ForgeDirection.UP))
+                    && (getSuctionAmount(ForgeDirection.UP) >= ic.getMinimumSuction())) {
                 ta = ic.getEssentiaType(inputDir.getOpposite());
             }
             if ((ta != null) && (ic.getSuctionAmount(inputDir.getOpposite()) < getSuctionAmount(ForgeDirection.UP))) {
@@ -165,45 +266,73 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public void readCustomNBT(NBTTagCompound compound) {
+
+        // A) parentBlock + parentMetadata (ТИП банки) — для текстур/логики
         String parentType = compound.getString("parentType");
-        if(parentType.length() > 0) {
+        if (parentType != null && !parentType.isEmpty()) {
             Block block = GameData.getBlockRegistry().getObject(parentType);
-            if(block != null && compound.hasKey("parent") && compound.hasKey("parentMetadata")) {
-                NBTTagCompound data = compound.getCompoundTag("parent");
-                int metadata = compound.getInteger("parentMetadata");
-                TileEntity tile = block.createTileEntity(getWorldObj(), metadata);
-                if(tile instanceof TileJarFillable) {
-                    placedOn = ForgeDirection.getOrientation(compound.getInteger("placedOn"));
-                    tile.readFromNBT(data);
-                    init((TileJarFillable) tile, block, metadata, placedOn);
-                }
+            if (block != null) {
+                this.parentBlock = block;
+                this.parentMetadata = compound.hasKey("parentMetadata") ? compound.getInteger("parentMetadata") : 0;
             }
         }
 
-        if(!isValid() && !getWorldObj().isRemote) {
-            getWorldObj().setBlockToAir(xCoord, yCoord, zCoord);
+        // B) placedOn (СТОРОНА крепления) — это МЕТАДАТА sticky-блока
+        if (worldObj != null && compound.hasKey("placedOn")) {
+            int placed = compound.getInteger("placedOn");
+            if (placed < 0 || placed > 6)
+                placed = ForgeDirection.DOWN.ordinal();
+            worldObj.setBlockMetadataWithNotify(xCoord, yCoord, zCoord, placed, 2);
+        }
+
+        // C) если нет parent NBT — выходим, но parentBlock/parentMetadata уже сохранены
+        // (рендер сможет жить)
+        if (parentBlock == null || !compound.hasKey("parent")) {
+            return;
+        }
+
+        // D) восстановить ТЕ родителя из NBT (важно: не через createTileEntity, а через
+        // createAndLoadEntity)
+        NBTTagCompound parentTag = compound.getCompoundTag("parent");
+
+        // через один вход: создаём parent TE из NBT и настраиваем всё одинаково
+        initFromNBT(parentTag, parentBlock, this.parentMetadata != null ? this.parentMetadata : 0);
+
+        markDirty();
+        if (worldObj != null) {
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
         }
     }
 
     @Override
     public void writeCustomNBT(NBTTagCompound compound) {
-        if(isValid()) {
-            compound.setString("parentType", GameData.getBlockRegistry().getNameForObject(parentBlock));
-            compound.setInteger("parentMetadata", parentMetadata);
 
+        // 1) Всегда пишем хотя бы тип и мету родителя (если знаем блок)
+        if (parentBlock != null) {
+            String id = GameData.getBlockRegistry().getNameForObject(parentBlock);
+            if (id != null && !id.isEmpty()) {
+                compound.setString("parentType", id);
+                compound.setInteger("parentMetadata", parentMetadata != null ? parentMetadata : 0);
+            }
+        }
+
+        // 2) placedOn можно писать всегда, если мир уже есть
+        if (worldObj != null) {
+            compound.setInteger("placedOn", getPlacedOn().ordinal());
+        }
+
+        // 3) Сам NBT родителя пишем только если parent уже создан
+        if (parent != null) {
             syncToParent();
-
             NBTTagCompound data = new NBTTagCompound();
             parent.writeToNBT(data);
             compound.setTag("parent", data);
-
-            compound.setInteger("placedOn", placedOn.ordinal());
         }
     }
 
     @Override
     public AspectList getAspects() {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             AspectList result = parent.getAspects();
             syncFromParent();
@@ -214,16 +343,16 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public void setAspects(AspectList paramAspectList) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
-            parent.getAspects();
+            parent.setAspects(paramAspectList);
             syncFromParent();
         }
     }
 
     @Override
     public boolean doesContainerAccept(Aspect paramAspect) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             boolean result = parent.doesContainerAccept(paramAspect);
             syncFromParent();
@@ -234,7 +363,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public int addToContainer(Aspect paramAspect, int paramInt) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             int result = parent.addToContainer(paramAspect, paramInt);
             syncFromParent();
@@ -245,7 +374,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public boolean takeFromContainer(Aspect paramAspect, int paramInt) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             boolean result = parent.takeFromContainer(paramAspect, paramInt);
             syncFromParent();
@@ -256,7 +385,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public boolean takeFromContainer(AspectList paramAspectList) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             boolean result = parent.takeFromContainer(paramAspectList);
             syncFromParent();
@@ -267,7 +396,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public boolean doesContainerContainAmount(Aspect paramAspect, int paramInt) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             boolean result = parent.doesContainerContainAmount(paramAspect, paramInt);
             syncFromParent();
@@ -278,7 +407,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public boolean doesContainerContain(AspectList paramAspectList) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             boolean result = parent.doesContainerContain(paramAspectList);
             syncFromParent();
@@ -289,7 +418,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public int containerContains(Aspect paramAspect) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             int result = parent.containerContains(paramAspect);
             syncFromParent();
@@ -300,7 +429,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public boolean isConnectable(ForgeDirection face) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             return parent.isConnectable(changeDirection(face));
         }
@@ -309,7 +438,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public boolean canInputFrom(ForgeDirection face) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             boolean result = parent.canInputFrom(changeDirection(face));
             syncFromParent();
@@ -320,7 +449,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public boolean canOutputTo(ForgeDirection face) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             boolean result = parent.canOutputTo(changeDirection(face));
             syncFromParent();
@@ -330,36 +459,39 @@ public class TileStickyJar extends TileJarFillable {
     }
 
     public ForgeDirection changeDirection(ForgeDirection face) {
-        if(placedOn == ForgeDirection.UP) {
-            if(face == ForgeDirection.UP || face == ForgeDirection.DOWN) {
+        ForgeDirection placedOn = getPlacedOn();
+
+        if (placedOn == ForgeDirection.UP) {
+            if (face == ForgeDirection.UP || face == ForgeDirection.DOWN) {
                 return face.getOpposite();
             }
             return face;
         }
 
-        if(placedOn == ForgeDirection.DOWN) {
+        if (placedOn == ForgeDirection.DOWN) {
             return face;
         }
 
-
-        if(face == ForgeDirection.UP) {
+        if (face == ForgeDirection.UP) {
             return ForgeDirection.NORTH;
         }
-        if(face == ForgeDirection.DOWN) {
+        if (face == ForgeDirection.DOWN) {
             return ForgeDirection.SOUTH;
         }
-        if(face == placedOn) {
+        if (face == placedOn) {
             return ForgeDirection.DOWN;
         }
-        if(face == placedOn.getOpposite()) {
+        if (face == placedOn.getOpposite()) {
             return ForgeDirection.UP;
         }
 
-
         switch (placedOn) {
-            case EAST: return face == ForgeDirection.NORTH ? ForgeDirection.WEST : ForgeDirection.EAST;
-            case SOUTH: return face.getOpposite();
-            case WEST: return face == ForgeDirection.SOUTH ? ForgeDirection.WEST : ForgeDirection.EAST;
+            case EAST:
+                return face == ForgeDirection.NORTH ? ForgeDirection.WEST : ForgeDirection.EAST;
+            case SOUTH:
+                return face.getOpposite();
+            case WEST:
+                return face == ForgeDirection.SOUTH ? ForgeDirection.WEST : ForgeDirection.EAST;
         }
 
         return face;
@@ -367,7 +499,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public void setSuction(Aspect paramAspect, int paramInt) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             parent.setSuction(paramAspect, paramInt);
             syncFromParent();
@@ -376,7 +508,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public Aspect getSuctionType(ForgeDirection paramForgeDirection) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             Aspect result = parent.getSuctionType(changeDirection(paramForgeDirection));
             syncFromParent();
@@ -387,7 +519,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public int getSuctionAmount(ForgeDirection paramForgeDirection) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             int result = parent.getSuctionAmount(changeDirection(paramForgeDirection));
             syncFromParent();
@@ -398,7 +530,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public int takeEssentia(Aspect paramAspect, int paramInt, ForgeDirection paramForgeDirection) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             int result = parent.takeEssentia(paramAspect, paramInt, changeDirection(paramForgeDirection));
             syncFromParent();
@@ -409,7 +541,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public int addEssentia(Aspect paramAspect, int paramInt, ForgeDirection paramForgeDirection) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             int result = parent.addEssentia(paramAspect, paramInt, changeDirection(paramForgeDirection));
             syncFromParent();
@@ -420,7 +552,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public Aspect getEssentiaType(ForgeDirection paramForgeDirection) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             Aspect result = parent.getEssentiaType(changeDirection(paramForgeDirection));
             syncFromParent();
@@ -431,7 +563,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public int getEssentiaAmount(ForgeDirection paramForgeDirection) {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             int result = parent.getEssentiaAmount(changeDirection(paramForgeDirection));
             syncFromParent();
@@ -442,7 +574,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public int getMinimumSuction() {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             int result = parent.getMinimumSuction();
             syncFromParent();
@@ -453,7 +585,7 @@ public class TileStickyJar extends TileJarFillable {
 
     @Override
     public boolean renderExtendedTube() {
-        if(isValid()) {
+        if (isValid()) {
             syncToParent();
             boolean result = parent.renderExtendedTube();
             syncFromParent();

@@ -1,9 +1,10 @@
 buildscript {
     repositories {
+        mavenLocal()
         mavenCentral()
         maven {
             name = "forge"
-            url = "http://files.minecraftforge.net/maven"
+            url = "https://maven.minecraftforge.net/"
         }
         maven {
             name = "sonatype"
@@ -11,22 +12,38 @@ buildscript {
         }
     }
     dependencies {
-        classpath 'net.minecraftforge.gradle:ForgeGradle:1.2-SNAPSHOT'
+        classpath ('com.anatawa12.forge:ForgeGradle:1.2-1.1.+') { changing = true }
+        // classpath 'net.minecraftforge.gradle:ForgeGradle:1.2-SNAPSHOT'
     }
+}
+
+plugins {
+    id 'java-library'
+    id 'maven-publish'
 }
 
 apply plugin: 'forge'
 
-version = "1.7.10-1.0.7.1"
-group= "makeo.gadomancy"
-archivesBaseName = "gadomancy"
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+version = project.version
+group = project.group
+archivesBaseName = project.archivesBaseName
 
 minecraft {
-    version = "1.7.10-10.13.4.1448-1.7.10"
+    version = project.minecraft_version + "-" + project.forge_version
     runDir = "run"
 }
 
 dependencies {
+    implementation files(
+        './libs/Thaumcraft-1.7.10-4.2.3.5.jar',
+        './libs/Baubles-1.7.10-1.0.1.10.jar',
+        './libs/mystcraft-0.12.3.04.jar',
+        './libs/thaumichorizons-1.7.10-1.1.9.jar',
+        './libs/Waila-1.5.10_1.7.10.jar'
+    )
 }
 
 jar {
@@ -37,8 +54,14 @@ jar {
     }
 }
 
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
 processResources
 {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
     // this will ensure that this task is redone when the versions change.
     inputs.property "version", project.version
     inputs.property "mcversion", project.minecraft.version
@@ -56,3 +79,6 @@ processResources
         exclude 'mcmod.info'
     }
 }
+
+// tasks.downloadClient.enabled = false
+// tasks.downloadServer.enabled = false

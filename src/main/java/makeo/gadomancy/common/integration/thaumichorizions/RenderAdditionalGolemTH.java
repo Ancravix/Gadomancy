@@ -96,6 +96,6 @@ public class RenderAdditionalGolemTH extends RenderGolemTH {
         if (type != null) {
             return type.getEntityTexture();
         }
-        return super.getEntityTexture(entity);
+        return super.func_110775_a(entity); // super.getEntityTexture(entity);
     }
 }
